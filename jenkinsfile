@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+
+    environment {
+        dockerHubCredentialsID = 'DockerHub'
+        imageName = 'marwantarek11/Java-APP'
+        openshiftCredentialsID = 'openshift'
+        nameSpace = 'marwantarek'
+        clusterUrl = 'https://api.ocp-training.ivolve-test.com:6443'
+        sonarTokenCredentialsID     = 'sonar-token'
+    }
+
+    stages {
+        stage('Running Test') {
+            steps {
+                script {
+                    runUnitTests() 
+                }
+            }
+        }
+
+        stage('Build App') {
+            steps {
+                script {
+                    Build()
+                }
+            }
+        }
+
+        stage('Sonarqube Analysis') {
+            steps {
+                script {
+                    Sonarqube()
+                    }
+                }
+            }
+        
+
+        stage('Build & Push Docker Image') {
+            steps {
+                script {
+                    buildandPushDockerImage(dockerHubCredentialsID, imageName)
+            }
+        }
+    }
+        stage('editNewImage') {
+            steps {
+                script {
+                    editNewImage(imageName)
+                }
+            }
+        }
+        stage('deployOnOc') {
+            steps {
+                script {
+                    deployOnOc(openshiftCredentialsID, nameSpace, clusterUrl)
+                }
+            }
+        }
+    }
+    post {
+        success {
+            echo "${JOB_NAME}-${BUILD_NUMBER} pipeline succeeded"
+        }
+        failure {
+            echo "${JOB_NAME}-${BUILD_NUMBER} pipeline failed"
+        }
+    }         
+}
