@@ -7,7 +7,7 @@ pipeline {
         openshiftCredentialsID = 'openshift'
         nameSpace = 'marwantarek'
         clusterUrl = 'https://api.ocp-training.ivolve-test.com:6443'
-        sonarTokenCredentialsID     = 'sonar-token'
+        sonarTokenCredentialsID     = 'sonarqube'
     }
 
     stages {
