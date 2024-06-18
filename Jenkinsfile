@@ -55,7 +55,7 @@ pipeline {
         stage('editNewImage') {
             steps {
                 script {
-                        dir('') {
+                        dir('openshift') {
                     editNewImage(imageName)
                 }
             }
@@ -64,7 +64,7 @@ pipeline {
         stage('deployOnOc') {
             steps {
                 script {
-                        dir('') {
+                        dir('openshift') {
                     deployOnOc(openshiftCredentialsID, nameSpace, clusterUrl)
                 }
             }
