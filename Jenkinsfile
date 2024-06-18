@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         dockerHubCredentialsID = 'DockerHub'
-        imageName = 'marwantarek11/Java-APP'
+        imageName = 'marwantarek11/java-app'
         openshiftCredentialsID = 'openshift'
         nameSpace = 'marwantarek'
         clusterUrl = 'https://api.ocp-training.ivolve-test.com:6443'
