@@ -8,7 +8,7 @@ pipeline {
         openshiftCredentialsID = 'openshift'
         nameSpace = 'marwantarek'
         clusterUrl = 'https://api.ocp-training.ivolve-test.com:6443'
-        sonarqubeUrl                = 'http://44.206.246.88:9000/'
+        sonarqubeUrl                = 'http://52.91.204.253:9000/'
         sonarTokenCredentialsID     = 'sonarqube'
     }
 
