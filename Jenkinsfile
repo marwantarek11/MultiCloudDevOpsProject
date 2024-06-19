@@ -20,15 +20,6 @@ pipeline {
                 }
             }
         }
-        stage('Build App') {
-            steps {
-                script {
-                        dir('Application') {
-                    build()
-                }
-            }
-        }
-    }        
         stage('Running Test') {
             steps {
                 script {
@@ -38,6 +29,16 @@ pipeline {
             }
         }
     }
+        stage('Build App') {
+            steps {
+                script {
+                        dir('Application') {
+                    build()
+                }
+            }
+        }
+    }        
+        
         stage('Sonarqube Analysis') {
             steps {
                 script {
