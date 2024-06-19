@@ -5,7 +5,7 @@ metadata:
 spec:
   to:
     kind: Service
-    name: java-app-service
+    name: ivolve-app-service
   port:
     targetPort: 8081
   tls:
