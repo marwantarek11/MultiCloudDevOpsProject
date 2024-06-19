@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
       - name: ivolve-app
-        image: marwantarek/ivolve-app:v1
+        image: marwantarek/ivolve-app
         ports:
         - containerPort: 8081
