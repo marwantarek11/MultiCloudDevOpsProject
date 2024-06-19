@@ -56,6 +56,15 @@ pipeline {
         }
     }
 }
+        stage('editDeploymentYaml') {
+            steps {
+                script {
+                        dir('openshift') {
+                   editDeploymentYaml(imageName)
+                }
+            }
+        }
+    }
                
         stage('deployOnOc') {
             steps {
