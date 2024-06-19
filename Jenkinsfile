@@ -4,7 +4,7 @@ pipeline {
 
     environment {
         dockerHubCredentialsID = 'DockerHub'
-        imageName = 'marwantarek11/java-app'
+        imageName = 'marwantarek11/ivolve-app'
         openshiftCredentialsID = 'openshift'
         nameSpace = 'marwantarek'
         clusterUrl = 'https://api.ocp-training.ivolve-test.com:6443'
@@ -13,6 +13,22 @@ pipeline {
     }
 
     stages {
+        stage('Repo Checkout') {
+            steps {
+            	script {
+                	checkRepo()
+                }
+            }
+        }
+        stage('Build App') {
+            steps {
+                script {
+                        dir('Application') {
+                    build()
+                }
+            }
+        }
+    }        
         stage('Running Test') {
             steps {
                 script {
@@ -22,27 +38,15 @@ pipeline {
             }
         }
     }
-        stage('Build App') {
-            steps {
-                script {
-                        dir('Application') {
-                    Build()
-                }
-            }
-        }
-    }
-
         stage('Sonarqube Analysis') {
             steps {
                 script {
                         dir('Application') {
-                    Sonarqube()
+                    runSonarQubeAnalysis()
                     }
                 }
             }
-    }
-        
-
+        }   
         stage('Build & Push Docker Image') {
             steps {
                 script {
@@ -60,12 +64,12 @@ pipeline {
                 }
             }
         }
-}
+    }        
         stage('deployOnOc') {
             steps {
                 script {
                         dir('openshift') {
-                    deployOnOc(openshiftCredentialsID, nameSpace, clusterUrl)
+                   deployOnOpenshift(openshiftCredentialsID, nameSpace, clusterUrl)
                 }
             }
         }
