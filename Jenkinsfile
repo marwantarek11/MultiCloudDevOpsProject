@@ -56,15 +56,7 @@ pipeline {
         }
     }
 }
-        stage('editNewImage') {
-            steps {
-                script {
-                        dir('openshift') {
-                    editNewImage(imageName)
-                }
-            }
-        }
-    }        
+               
         stage('deployOnOc') {
             steps {
                 script {
