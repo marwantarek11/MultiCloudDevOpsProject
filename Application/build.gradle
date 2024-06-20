@@ -2,6 +2,13 @@ plugins {
     id 'org.springframework.boot' version '2.6.3'
     id 'io.spring.dependency-management' version '1.0.11.RELEASE'
     id 'java'
+    id "org.sonarqube" version "5.0.0.4638"
+}
+sonar {
+  properties {
+    property "sonar.projectKey", "my-sonarqube-demo"
+    property "sonar.projectName", "my-sonarqube-demo"
+  }
 }
 
 group = 'com.example'
@@ -16,6 +23,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-thymeleaf' // Add this if using Thymeleaf
     testImplementation('org.springframework.boot:spring-boot-starter-test')
+    implementation 'org.springframework.boot:spring-boot-starter'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
 test {
