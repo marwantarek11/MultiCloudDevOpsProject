@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ivolve-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ivolve-app
+  template:
+    metadata:
+      labels:
+        app: ivolve-app
+    spec:
+      containers:
+      - name: ivolve-app
+        image: marwantarek11/ivolve-app
+        ports:
+        - containerPort: 8081

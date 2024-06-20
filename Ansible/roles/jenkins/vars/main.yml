@@ -1,0 +1,9 @@
+---
+jenkins_user: 'marwan'
+jenkins_password: 'marwan'
+jenkins_fullname: 'marwan tarek'
+jenkins_email: 'marawantarek17@gmail.com'
+jenkins_group: jenkins
+jenkins_home: /var/lib/jenkins
+jenkins_url: http://pkg.jenkins.io/debian-stable/jenkins.io.key
+jenkins_repo: deb http://pkg.jenkins.io/debian-stable binary/
