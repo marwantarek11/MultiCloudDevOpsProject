@@ -3,7 +3,7 @@
 Welcome to the MultiCloudDevOpsProject! This project is designed to demonstrate the implementation of a complete DevOps pipeline with multi-cloud support. The project covers infrastructure provisioning, configuration management, containerization, continuous integration, automated deployment, monitoring, and logging. The tools and technologies used include Terraform, Ansible, Docker, Jenkins, and AWS services.
 
 ## Project Architecture 
-
+![Diagram](https://raw.githubusercontent.com/marwantarek11/MultiCloudDevOpsProject/main/Marwan%20Diagram.drawio%20(4).svg)
 ## Table of Contents
 - [Prerequisites](#prerequisites)
 - [Infrastructure Provisioning with Terraform](#infrastructure-provisioning-with-terraform)
