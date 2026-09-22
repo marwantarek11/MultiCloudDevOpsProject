@@ -2,7 +2,16 @@ plugins {
     id 'org.springframework.boot' version '2.6.3'
     id 'io.spring.dependency-management' version '1.0.11.RELEASE'
     id 'java'
+    id 'checkstyle'
     id "org.sonarqube" version "5.0.0.4638"
+}
+
+checkstyle {
+    toolVersion = '10.12.4'
+    configFile = file("${rootDir}/config/checkstyle/checkstyle.xml")
+    // Report only for now, matching the "scan but don't block" approach used for the
+    // Trivy image scan stage - flip to false once the codebase is warning-clean.
+    ignoreFailures = true
 }
 sonar {
   properties {

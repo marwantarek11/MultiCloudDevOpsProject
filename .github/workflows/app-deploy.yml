@@ -1,0 +1,74 @@
+name: App Deploy
+
+on:
+  push:
+    branches: [main]
+    paths: ["Application/**", "k8s/**"]
+  pull_request:
+    paths: ["Application/**", "k8s/**"]
+
+env:
+  IMAGE: docker-registry.docker-registry.svc.cluster.local:5000/multicloud-app
+  NAMESPACE: multicloud-devops
+  DEPLOYMENT: multicloud-app
+
+jobs:
+  build-test-deploy:
+    runs-on: arc-runner-set
+    defaults:
+      run:
+        working-directory: Application
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # 11 matches build.gradle's sourceCompatibility; the Gradle 7.3.3 wrapper's
+          # Checkstyle task crashes under JDK 17+ due to a module-system incompatibility.
+          java-version: "11"
+
+      - name: Unit tests
+        run: ./gradlew test --no-daemon
+
+      - name: Static analysis (Checkstyle)
+        run: ./gradlew checkstyleMain --no-daemon
+
+      - name: Build
+        run: ./gradlew build -x test --no-daemon
+
+      - name: Build Docker image
+        run: docker build -t ${{ env.IMAGE }}:${{ github.sha }} -t ${{ env.IMAGE }}:latest .
+
+      - name: Scan image (Trivy, report only)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          format: table
+          exit-code: "0"
+
+      - name: Push Docker image
+        if: github.event_name == 'push'
+        run: |
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      - name: Deploy
+        if: github.event_name == 'push'
+        run: |
+          kubectl -n ${{ env.NAMESPACE }} set image deployment/${{ env.DEPLOYMENT }} \
+            ${{ env.DEPLOYMENT }}=${{ env.IMAGE }}:${{ github.sha }}
+          kubectl -n ${{ env.NAMESPACE }} rollout status deployment/${{ env.DEPLOYMENT }} --timeout=120s
+
+      - name: Smoke test
+        if: github.event_name == 'push'
+        run: |
+          kubectl -n ${{ env.NAMESPACE }} run smoke-test --rm -i --restart=Never \
+            --image=curlimages/curl:8.10.1 -- \
+            curl -sf --max-time 10 http://multicloud-app-service.${{ env.NAMESPACE }}.svc:8081/
+
+      - name: Roll back on failure
+        if: failure() && github.event_name == 'push'
+        run: kubectl -n ${{ env.NAMESPACE }} rollout undo deployment/${{ env.DEPLOYMENT }}
