@@ -26,8 +26,10 @@ jobs:
         if: github.event_name == 'push'
         working-directory: /tmp
         run: |
+          mkdir -p "$HOME/bin"
           curl -sLO "https://dl.k8s.io/release/$(curl -sL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          install -m 0755 kubectl /usr/local/bin/kubectl
+          install -m 0755 kubectl "$HOME/bin/kubectl"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
 
       - name: Set up JDK
         uses: actions/setup-java@v4
