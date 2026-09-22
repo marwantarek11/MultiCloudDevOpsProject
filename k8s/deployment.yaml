@@ -35,3 +35,4 @@ spec:
 # retrigger 1790087702
 # retrigger 1790089362
 # retrigger 1790090215 after tcp_mtu_probing fix
+# retrigger 1790093112 retry after network diagnosis
