@@ -3,9 +3,9 @@ name: App Deploy
 on:
   push:
     branches: [main]
-    paths: ["Application/**", "k8s/**"]
+    paths: ["Application/**", "k8s/**", ".github/workflows/**"]
   pull_request:
-    paths: ["Application/**", "k8s/**"]
+    paths: ["Application/**", "k8s/**", ".github/workflows/**"]
 
 env:
   # The runner pod has a socat sidecar forwarding localhost:5000 to the in-cluster registry
@@ -56,15 +56,51 @@ jobs:
         run: docker build -t ${{ env.PUSH_IMAGE }}:${{ github.sha }} -t ${{ env.PUSH_IMAGE }}:latest .
 
       - name: Scan image (Trivy, report only)
+        id: trivy
         uses: aquasecurity/trivy-action@v0.36.0
         # Report-only: a scanner or vulnerability-DB download problem must not block the deploy.
         continue-on-error: true
         with:
           image-ref: ${{ env.PUSH_IMAGE }}:${{ github.sha }}
           format: table
+          output: trivy-report.txt
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
           exit-code: "0"
           scanners: vuln
           timeout: 20m
+
+      - name: Publish Trivy report
+        if: always()
+        run: |
+          REPORT="$GITHUB_WORKSPACE/trivy-report.txt"
+          OUTCOME="${{ steps.trivy.outcome }}"
+          {
+            echo "## Trivy image scan"
+            echo "Image: \`${{ env.PUSH_IMAGE }}:${{ github.sha }}\` - CRITICAL/HIGH findings that have a fix available"
+            echo "Scan step outcome: \`$OUTCOME\`"
+            echo
+            if [ -s "$REPORT" ]; then
+              echo '```'
+              cat "$REPORT"
+              echo '```'
+            else
+              echo "> No report was produced, the scan did not complete."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -s "$REPORT" ]; then
+            cat "$REPORT"
+          else
+            echo "::warning::Trivy produced no report (step outcome: $OUTCOME)"
+          fi
+
+      - name: Upload Trivy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.txt
+          if-no-files-found: ignore
 
       - name: Push Docker image
         if: github.event_name == 'push'
