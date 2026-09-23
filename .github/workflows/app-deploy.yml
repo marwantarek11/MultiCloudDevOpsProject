@@ -8,7 +8,11 @@ on:
     paths: ["Application/**", "k8s/**"]
 
 env:
-  IMAGE: docker-registry.docker-registry.svc.cluster.local:5000/multicloud-app
+  # The runner pod has a socat sidecar forwarding localhost:5000 to the in-cluster registry
+  # (dockerd trusts localhost registries without TLS). kubelet pulls the same registry through
+  # its NodePort, which containerd on the node is configured to trust.
+  PUSH_IMAGE: localhost:5000/multicloud-app
+  PULL_IMAGE: localhost:30500/multicloud-app
   NAMESPACE: multicloud-devops
   DEPLOYMENT: multicloud-app
 
@@ -49,35 +53,40 @@ jobs:
         run: ./gradlew build -x test --no-daemon
 
       - name: Build Docker image
-        run: docker build -t ${{ env.IMAGE }}:${{ github.sha }} -t ${{ env.IMAGE }}:latest .
+        run: docker build -t ${{ env.PUSH_IMAGE }}:${{ github.sha }} -t ${{ env.PUSH_IMAGE }}:latest .
 
       - name: Scan image (Trivy, report only)
         uses: aquasecurity/trivy-action@v0.36.0
+        # Report-only: a scanner or vulnerability-DB download problem must not block the deploy.
+        continue-on-error: true
         with:
-          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          image-ref: ${{ env.PUSH_IMAGE }}:${{ github.sha }}
           format: table
           exit-code: "0"
+          scanners: vuln
+          timeout: 20m
 
       - name: Push Docker image
         if: github.event_name == 'push'
         run: |
-          docker push ${{ env.IMAGE }}:${{ github.sha }}
-          docker push ${{ env.IMAGE }}:latest
+          docker push ${{ env.PUSH_IMAGE }}:${{ github.sha }}
+          docker push ${{ env.PUSH_IMAGE }}:latest
 
       - name: Deploy
+        id: deploy
         if: github.event_name == 'push'
         run: |
           kubectl -n ${{ env.NAMESPACE }} set image deployment/${{ env.DEPLOYMENT }} \
-            ${{ env.DEPLOYMENT }}=${{ env.IMAGE }}:${{ github.sha }}
-          kubectl -n ${{ env.NAMESPACE }} rollout status deployment/${{ env.DEPLOYMENT }} --timeout=120s
+            ${{ env.DEPLOYMENT }}=${{ env.PULL_IMAGE }}:${{ github.sha }}
+          kubectl -n ${{ env.NAMESPACE }} rollout status deployment/${{ env.DEPLOYMENT }} --timeout=180s
 
       - name: Smoke test
+        id: smoke
         if: github.event_name == 'push'
         run: |
-          kubectl -n ${{ env.NAMESPACE }} run smoke-test --rm -i --restart=Never \
-            --image=curlimages/curl:8.10.1 -- \
-            curl -sf --max-time 10 http://multicloud-app-service.${{ env.NAMESPACE }}.svc:8081/
+          curl -sf --retry 5 --retry-delay 3 --retry-connrefused --max-time 10 \
+            http://multicloud-app-service.${{ env.NAMESPACE }}.svc:8080/
 
       - name: Roll back on failure
-        if: failure() && github.event_name == 'push'
+        if: failure() && (steps.deploy.outcome == 'failure' || steps.smoke.outcome == 'failure')
         run: kubectl -n ${{ env.NAMESPACE }} rollout undo deployment/${{ env.DEPLOYMENT }}

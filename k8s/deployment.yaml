@@ -15,9 +15,11 @@ spec:
     spec:
       containers:
         - name: multicloud-app
-          image: docker-registry.docker-registry.svc.cluster.local:5000/multicloud-app:latest
+          # kubelet pulls through the registry's NodePort; the CI runner pushes to the same
+          # registry via the in-cluster service name (node DNS can't resolve *.svc names).
+          image: localhost:30500/multicloud-app:latest
           ports:
-            - containerPort: 8081
+            - containerPort: 8080
 ---
 apiVersion: v1
 kind: Service
@@ -29,10 +31,5 @@ spec:
     app: multicloud-app
   ports:
     - protocol: TCP
-      port: 8081
-      targetPort: 8081
-# Deployed via ARC CI pipeline
-# retrigger 1790087702
-# retrigger 1790089362
-# retrigger 1790090215 after tcp_mtu_probing fix
-# retrigger 1790093112 retry after network diagnosis
+      port: 8080
+      targetPort: 8080
