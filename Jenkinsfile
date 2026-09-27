@@ -1,82 +1,108 @@
-@Library('shared-library')_
+@Library('shared-library@kubeadm')_  // TODO: back to 'shared-library' after merging the library's kubeadm branch
 pipeline {
-    agent any
+    // Pod with gradle, kaniko, trivy and kubectl containers (resources/podTemplates/build-pod.yaml in the shared library)
+    agent {
+        kubernetes {
+            yaml libraryResource('podTemplates/build-pod.yaml')
+            defaultContainer 'gradle'
+        }
+    }
+
+    options {
+        timestamps()
+        timeout(time: 45, unit: 'MINUTES')
+    }
 
     environment {
-        dockerHubCredentialsID = 'DockerHub'
-        imageName = 'marwantarek11/ivolve-app'
-        openshiftCredentialsID = 'openshift'
-        nameSpace = 'marwantarek'
-        clusterUrl = 'https://api.ocp-training.ivolve-test.com:6443'
-        sonarqubeUrl                = 'http://18.204.222.126:9000/'
-        sonarTokenCredentialsID     = 'sonarqube'
+        imageName          = 'ivolve-app'
+        pushRegistry       = 'docker-registry.docker-registry.svc:5000'   // Kaniko pushes via the in-cluster service
+        pullRegistry       = 'localhost:30500'                            // kubelet pulls via the registry NodePort
+        nameSpace          = 'ivolve'
+        sonarServer        = 'sonarqube'
+        trivyServer        = 'http://trivy.trivy.svc:4954'
+        trivyCredentialsID = 'trivy-token'
     }
 
     stages {
-        stage('Repo Checkout') {
-            steps {
-            	script {
-                	checkRepo()
-                }
-            }
-        }
         stage('Running Test') {
             steps {
                 script {
-                        dir('Application') {
-                    runUnitTests() 
-                }
-            }
-        }
-    }
-        stage('Build App') {
-            steps {
-                script {
-                        dir('Application') {
-                    build()
-                }
-            }
-        }
-    }        
-        
-        stage('Sonarqube Analysis') {
-            steps {
-                script {
-                        dir('Application') {
-                    runSonarQubeAnalysis()
+                    dir('Application') {
+                        runUnitTests()
                     }
                 }
             }
-        }   
-        stage('Build & Push Docker Image') {
-            steps {
-                script {
-                        dir('Application') {
-                    buildandPushDockerImage(dockerHubCredentialsID, imageName)
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'Application/build/test-results/test/*.xml'
+                }
             }
         }
-    }
-}
+
+        stage('Build App') {
+            steps {
+                script {
+                    dir('Application') {
+                        build()
+                    }
+                }
+            }
+        }
+
+        stage('Sonarqube Analysis') {
+            steps {
+                script {
+                    dir('Application') {
+                        runSonarQubeAnalysis(sonarServer)
+                    }
+                }
+            }
+        }
+
+        stage('Build & Push Image') {
+            steps {
+                script {
+                    dir('Application') {
+                        buildAndPushImage("${pushRegistry}/${imageName}:${BUILD_NUMBER}")
+                    }
+                }
+            }
+        }
+
+        stage('Trivy Scan') {
+            steps {
+                script {
+                    // Report only for now: set failBuild: true to block on HIGH/CRITICAL findings
+                    trivyScan(image: "${pushRegistry}/${imageName}:${BUILD_NUMBER}",
+                              server: trivyServer,
+                              credentialsId: trivyCredentialsID,
+                              severity: 'HIGH,CRITICAL',
+                              failBuild: false)
+                }
+            }
+        }
+
         stage('editDeploymentYaml') {
             steps {
                 script {
-                        dir('openshift') {
-                   editDeploymentYaml(imageName)
+                    dir('kubernetes') {
+                        editDeploymentYaml("${pullRegistry}/${imageName}")
+                    }
                 }
             }
         }
-    }
-               
-        stage('deployOnOc') {
+
+        stage('Deploy on Kubernetes') {
             steps {
                 script {
-                        dir('openshift') {
-                   deployOnOpenshift(openshiftCredentialsID, nameSpace, clusterUrl)
+                    dir('kubernetes') {
+                        deployOnKubernetes(nameSpace, imageName)
+                    }
                 }
             }
         }
     }
-}
+
     post {
         success {
             echo "${JOB_NAME}-${BUILD_NUMBER} pipeline succeeded"
@@ -84,5 +110,5 @@ pipeline {
         failure {
             echo "${JOB_NAME}-${BUILD_NUMBER} pipeline failed"
         }
-    }         
+    }
 }

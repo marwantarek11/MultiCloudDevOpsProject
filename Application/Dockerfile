@@ -21,7 +21,7 @@ RUN chmod +x gradlew
 RUN ./gradlew build --stacktrace
 
 # Use a minimal base image for the runtime
-FROM adoptopenjdk:11-jre-hotspot
+FROM eclipse-temurin:11-jre
 
 # Set the working directory
 WORKDIR /app
