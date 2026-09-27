@@ -43,7 +43,7 @@ pipeline {
             steps {
                 script {
                     dir('Application') {
-                        build()
+                        build(skipTests: true)   // tests already ran in 'Running Test'
                     }
                 }
             }
