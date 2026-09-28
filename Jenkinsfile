@@ -10,7 +10,8 @@ pipeline {
 
     options {
         timestamps()
-        timeout(time: 45, unit: 'MINUTES')
+        // Includes up to 30 min waiting in 'Approve Deploy'
+        timeout(time: 75, unit: 'MINUTES')
     }
 
     environment {
@@ -18,6 +19,7 @@ pipeline {
         pushRegistry       = 'docker-registry.docker-registry.svc:5000'   // Kaniko pushes via the in-cluster service
         pullRegistry       = 'localhost:30500'                            // kubelet pulls via the registry NodePort
         nameSpace          = 'ivolve'
+        appUrl             = 'http://ivolve-app-service.ivolve.svc:8080/'
         sonarServer        = 'sonarqube'
         trivyServer        = 'http://trivy.trivy.svc:4954'
         trivyCredentialsID = 'trivy-token'
@@ -28,13 +30,15 @@ pipeline {
             steps {
                 script {
                     dir('Application') {
-                        runUnitTests()
+                        runUnitTests()   // also writes the JaCoCo coverage report (test finalizedBy jacocoTestReport)
                     }
                 }
             }
             post {
                 always {
                     junit allowEmptyResults: true, testResults: 'Application/build/test-results/test/*.xml'
+                    publishHTML(target: [reportName: 'Coverage Report', reportDir: 'Application/build/reports/jacoco/test/html',
+                                         reportFiles: 'index.html', keepAll: true, alwaysLinkToLastBuild: true, allowMissing: true])
                 }
             }
         }
@@ -49,11 +53,33 @@ pipeline {
             }
         }
 
-        stage('Sonarqube Analysis') {
-            steps {
-                script {
-                    dir('Application') {
-                        runSonarQubeAnalysis(sonarServer)
+        stage('Code Analysis') {
+            parallel {
+                stage('Sonarqube Analysis') {
+                    steps {
+                        script {
+                            dir('Application') {
+                                runSonarQubeAnalysis(sonarServer)
+                            }
+                        }
+                    }
+                }
+
+                stage('Dependency & Secret Scan') {
+                    steps {
+                        script {
+                            // Libraries bundled in the built jar + secrets in the sources, before spending time on the image.
+                            // Report only for now, like the image scan: set failBuild: true to block on HIGH/CRITICAL findings
+                            trivyScan(type: 'rootfs',
+                                      target: 'Application',
+                                      scanners: 'vuln,secret',
+                                      id: 'trivy-deps',
+                                      name: 'Dependency Scan',
+                                      server: trivyServer,
+                                      credentialsId: trivyCredentialsID,
+                                      severity: 'HIGH,CRITICAL',
+                                      failBuild: false)
+                        }
                     }
                 }
             }
@@ -82,6 +108,15 @@ pipeline {
             }
         }
 
+        stage('Approve Deploy') {
+            steps {
+                // Build pod stays up while waiting; no answer within 30 min aborts the build
+                timeout(time: 30, unit: 'MINUTES') {
+                    input message: "Deploy ${imageName}:${BUILD_NUMBER} to ${nameSpace}?", ok: 'Deploy'
+                }
+            }
+        }
+
         stage('editDeploymentYaml') {
             steps {
                 script {
@@ -98,6 +133,22 @@ pipeline {
                     dir('kubernetes') {
                         deployOnKubernetes(nameSpace, imageName)
                     }
+                }
+            }
+            post {
+                failure {
+                    rollbackDeployment(nameSpace, imageName)
+                }
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                smokeTest(url: appUrl)
+            }
+            post {
+                failure {
+                    rollbackDeployment(nameSpace, imageName)
                 }
             }
         }
